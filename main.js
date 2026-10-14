@@ -3,7 +3,8 @@ const { Plugin, MarkdownView, TFile, Modal, FuzzySuggestModal, Setting, Notice, 
 // Frontmatter:
 //   banner: <Set/codename>                       a banner from the library (Assets/Attachments/Banners)
 //   banner: <url | [[image]] | vault/path.jpg>   use this image
-//   banner: pattern:grid                         the plain grid pattern (also the default for older notes)
+//   banner: pattern:grid                         isometric dot pattern (also the default for older notes)
+//   banner: pattern:triangles                    triangle-lattice pattern
 //   banner: auto                                 pick by the rules now, even outside the auto folders
 //   banner: none                                 no banner
 //   banner_y: 0–100                                      vertical crop position (also reads banner-y)
@@ -311,7 +312,7 @@ module.exports = class VishnusBanners extends Plugin {
   isPublic(file) {
     const own = this.frontmatter(file).banner;
     const v = typeof own === "string" ? own.trim() : "";
-    if (!v || v === "pattern:grid") return true;
+    if (!v || v.startsWith("pattern:")) return true;
     const entry = v && v !== "auto" ? this.libraryIndex?.get(v.replace(/^!?\[\[|\]\]$/g, "")) : this.autoEntry(file);
     if (entry) return !!(entry.meta.url || entry.meta.ingit);
     return true; // URLs and vault images: the wiki build handles those
@@ -347,6 +348,7 @@ module.exports = class VishnusBanners extends Plugin {
     const value = fm.banner;
     if (value === "none" || value === false) return null;
     const own = typeof value === "string" && value.trim();
+    if (own === "pattern:triangles") return { pattern: "triangles" };
     if (own === "pattern:grid" || (!own && this.wantsAuto(file))) return { pattern: "grid" };
     const src = own === "auto" ? this.autoCover(file) : own ? this.toSrc(value, file) : null;
     // Library entry behind this banner (picked by hand, or the automatic one) for its default crop
@@ -403,6 +405,7 @@ module.exports = class VishnusBanners extends Plugin {
           } else if (!warn) badge?.remove();
         }
         el.toggleClass("vb-pattern", !!banner.pattern);
+        el.toggleClass("vb-pattern-triangles", banner.pattern === "triangles");
         el.style.backgroundImage = banner.pattern ? "" : `url("${banner.src}")`;
         el.style.backgroundPosition = banner.pattern ? "" : `50% ${banner.y}%`;
         // Bleed out to the scroll area's edges (top, left, right), past its padding
@@ -529,10 +532,12 @@ class BannerModal extends Modal {
     const gallery = contentEl.createDiv({ cls: "vb-gallery" });
     gallery.createEl("h6", { text: "Pattern" });
     const pgrid = gallery.createDiv({ cls: "vb-grid" });
-    const ptile = pgrid.createEl("button", { cls: "vb-tile vb-pattern-tile", attr: { title: "Grid pattern" } });
-    ptile.createDiv({ cls: "vb-banner vb-pattern" });
-    if (current === "pattern:grid" || current === undefined) ptile.addClass("is-selected");
-    ptile.addEventListener("click", () => choose("pattern:grid"));
+    for (const [value, label, extra] of [["pattern:grid", "Isometric dots", ""], ["pattern:triangles", "Triangle lattice", " vb-pattern-triangles"]]) {
+      const ptile = pgrid.createEl("button", { cls: "vb-tile vb-pattern-tile", attr: { title: label } });
+      ptile.createDiv({ cls: "vb-banner vb-pattern" + extra });
+      if (current === value || (value === "pattern:grid" && current === undefined)) ptile.addClass("is-selected");
+      ptile.addEventListener("click", () => choose(value));
+    }
     gallery.createDiv({ cls: "vb-legend", text: "Tiles marked ⌂ are local only: no public URL and not in git, so they won't show on the wiki." });
     const sets = [...new Set(plugin.library.map((e) => e.set))].sort();
     for (const set of sets) {
