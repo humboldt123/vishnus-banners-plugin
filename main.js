@@ -94,7 +94,8 @@ module.exports = class VishnusBanners extends Plugin {
   // autoSets are folder-name patterns: "Notion *", "Pomological", "*"
   buildAutoPool() {
     const pats = (this.libraryConf.autoSets ?? []).map((p) => new RegExp("^" + p.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$"));
-    const fromLibrary = this.library.filter((e) => e.src && pats.some((re) => re.test(e.set)));
+    // Membership comes from .banner files alone (committed everywhere), not from whether an image is present
+    const fromLibrary = this.library.filter((e) => pats.some((re) => re.test(e.set)));
     // Fall back to the plain URL list when the library isn't there (e.g. a fresh device)
     this.autoPool = fromLibrary.length ? fromLibrary
       : this.collections.filter((c) => c.auto).flatMap((c) => c.covers).map((url) => ({ src: url, meta: { url } }));
@@ -154,6 +155,8 @@ module.exports = class VishnusBanners extends Plugin {
         this.library.push({ set, code, key: `${set}/${code}`, meta, src: image ? adapter.getResourcePath(image) : meta.url ?? null });
       }
     }
+    // Stable order (the wiki build sorts the same way, so filename hashes pick the same banner)
+    this.library.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
     this.libraryIndex = new Map(this.library.map((e) => [e.key, e]));
   }
 
@@ -232,7 +235,7 @@ module.exports = class VishnusBanners extends Plugin {
     for (const rule of this.rules ?? []) {
       if (!rule.tags?.length || !this.ruleMatches(rule, file)) continue;
       if ((hash(file.basename + ":" + rule.name) % 1000) >= (rule.share ?? 1) * 1000) continue;
-      const pool = this.library.filter((e) => e.src && (e.meta.tags ?? []).some((t) => rule.tags.includes(t)));
+      const pool = this.library.filter((e) => (e.meta.tags ?? []).some((t) => rule.tags.includes(t)));
       if (pool.length) return pool[hash(file.basename) % pool.length];
     }
     return this.autoPool.length ? this.autoPool[hash(file.basename) % this.autoPool.length] : null;
