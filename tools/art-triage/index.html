@@ -41,6 +41,10 @@
   .group.has-comment { position: relative; }
 
   aside { border-left: 1px solid var(--border); display: flex; flex-direction: column; }
+  .zone.trash { flex: 0 0 auto; }
+  .zone.trash:not(.open) .drop { min-height: 70px; max-height: 70px; overflow: hidden; }
+  .zone.trash.open { flex: 1; }
+  .zone .head button { padding: 0 8px; font-size: 12px; font-weight: normal; }
   .zone { flex: 1; display: flex; flex-direction: column; border-bottom: 1px solid var(--border); min-height: 0; }
   .zone .head { padding: 12px 16px; font-weight: 600; display: flex; justify-content: space-between; }
   .zone.trash .head { color: var(--trash); }
@@ -78,7 +82,7 @@
     <div class="grid" id="unsorted"></div>
   </main>
   <aside>
-    <div class="zone trash"><div class="head">Trash <span id="trash-count"></span></div><div class="drop" data-bin="trash"></div></div>
+    <div class="zone trash"><div class="head"><span>Trash <span id="trash-count"></span></span><button id="trash-toggle">Show</button></div><div class="drop" data-bin="trash"></div></div>
     <div class="zone find"><div class="head">Find <span id="find-count"></span></div><div class="drop" data-bin="find"></div></div>
   </aside>
 </div>
@@ -143,9 +147,12 @@ function render() {
     if (state.comments[key]) { el.classList.add("has-comment"); el.title = `“${state.comments[key]}”`; }
     el.innerHTML = `<div class="title"></div><div class="meta"></div><div class="thumbs"></div>`;
     el.querySelector(".title").textContent = g.title;
-    el.querySelector(".meta").innerHTML = g.original
-      ? `Original ${g.originalRes} · <a href="${g.original}" target="_blank" rel="noopener">open</a> · your copy is lower-res`
-      : (g.note ?? "No original found yet");
+    const link = g.original ? ` · <a href="${g.original}" target="_blank" rel="noopener">${g.originalRes === "search" ? "find on Commons" : "open"}</a>` : "";
+    el.querySelector(".meta").innerHTML =
+      g.originalRes && g.originalRes !== "search"
+        ? `Original ${g.originalRes}${link} · your copy is lower-res`
+        : `${g.note ?? "No original found yet"}${link}`;
+    el.querySelector(".meta a")?.addEventListener("click", (e) => e.stopPropagation());
     for (const f of g.files) {
       const im = document.createElement("img");
       im.loading = "lazy"; im.src = img(f); im.draggable = true; im.title = f;
@@ -164,6 +171,12 @@ function render() {
   for (const drop of document.querySelectorAll(".drop")) {
     const bin = drop.dataset.bin;
     const items = catalog.all.filter((p) => state.bins[p] === bin);
+    const collapsed = bin === "trash" && !document.querySelector(".zone.trash").classList.contains("open");
+    if (collapsed && items.length) {
+      drop.replaceChildren(Object.assign(document.createElement("div"), { className: "empty", textContent: `${items.length} trashed — drop more here` }));
+      document.getElementById("trash-count").textContent = items.length;
+      continue;
+    }
     drop.replaceChildren(...(items.length ? items.map(tile) : [Object.assign(document.createElement("div"), {
       className: "empty", textContent: bin === "trash" ? "Drop images you don't want" : "Drop images to track down — you'll be asked for a note",
     })]));
@@ -183,6 +196,12 @@ function makeDropTarget(el, bin) {
     if (bin === "find" && !state.comments[p]) openComment(p, p, img(p));
   });
 }
+document.getElementById("trash-toggle").onclick = (e) => {
+  const z = document.querySelector(".zone.trash");
+  z.classList.toggle("open");
+  e.currentTarget.textContent = z.classList.contains("open") ? "Hide" : "Show";
+  render();
+};
 document.querySelectorAll(".drop").forEach((d) => makeDropTarget(d, d.dataset.bin));
 makeDropTarget(document.getElementById("unsorted"), null);
 
