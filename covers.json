@@ -1,9 +1,11 @@
 {
   "_comment": "Banner pools. Notes without a `banner:` get a cover from every collection with auto=true, picked by hashing the filename.",
   "auto": {
-    "_comment": "Where automatic covers apply. A note's own `banner:` always wins.",
-    "skipFolders": [
-      "People/"
+    "_comment": "Automatic covers only for Markdown notes in these folders. `banner: auto` turns one on anywhere; `banner: none` turns it off; any other `banner:` value is used as-is.",
+    "folders": [
+      "Notes/",
+      "Logs/",
+      "Dailys/"
     ],
     "minWords": {
       "Notes/": 500

@@ -1,7 +1,9 @@
 const { Plugin, MarkdownView, TFile, Modal, FuzzySuggestModal, Setting, Notice, setIcon } = require("obsidian");
 
 // Frontmatter:
-//   banner: <url | [[image]] | vault/path.jpg | none>   override the automatic cover
+//   banner: <url | [[image]] | vault/path.jpg>   use this image
+//   banner: auto                                 automatic cover, even outside the auto folders
+//   banner: none                                 no banner
 //   banner_y: 0–100                                      vertical crop position (also reads banner-y)
 
 const IMAGE_EXTS = ["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "svg"];
@@ -97,8 +99,9 @@ module.exports = class VishnusBanners extends Plugin {
 
   // Whether a note without its own `banner:` gets an automatic cover
   wantsAuto(file) {
-    const { skipFolders = [], minWords = {} } = this.autoRules;
-    if (skipFolders.some((f) => file.path.startsWith(f))) return false;
+    if (file.extension !== "md") return false;
+    const { folders = [], minWords = {} } = this.autoRules;
+    if (!folders.some((f) => file.path.startsWith(f))) return false;
     for (const [folder, min] of Object.entries(minWords)) {
       if (!file.path.startsWith(folder)) continue;
       const n = this.words(file);
@@ -128,7 +131,9 @@ module.exports = class VishnusBanners extends Plugin {
     const value = fm.banner;
     if (value === "none" || value === false) return null;
     const own = typeof value === "string" && value.trim();
-    const src = own ? this.toSrc(value, file) : this.wantsAuto(file) ? this.autoCover(file) : null;
+    const src = own === "auto" ? this.autoCover(file)
+      : own ? this.toSrc(value, file)
+      : this.wantsAuto(file) ? this.autoCover(file) : null;
     let y = parseFloat(fm.banner_y ?? fm["banner-y"]);
     if (isNaN(y)) y = 50;
     else if (y <= 1) y *= 100; // old Banners plugin stored 0–1
@@ -286,8 +291,9 @@ class BannerModal extends Modal {
 
     new Setting(contentEl)
       .setName("Automatic")
-      .setDesc("Use the cover picked from this note's filename.")
-      .addButton((b) => b.setButtonText("Reset").onClick(() => choose(undefined)))
+      .setDesc("A cover picked from this note's filename. “Default” follows the folder rules in covers.json.")
+      .addButton((b) => b.setButtonText("Always on").onClick(() => choose("auto")))
+      .addButton((b) => b.setButtonText("Default").onClick(() => choose(undefined)))
       .addButton((b) => b.setButtonText("No banner").setWarning().onClick(() => choose("none")));
 
     const gallery = contentEl.createDiv({ cls: "vb-gallery" });
