@@ -155,7 +155,7 @@
     },
     {
       "name": "Color & Gradient",
-      "auto": true,
+      "auto": false,
       "covers": [
         "https://www.notion.so/images/page-cover/gradients_10.jpg",
         "https://www.notion.so/images/page-cover/gradients_11.jpg",
