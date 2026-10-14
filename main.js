@@ -31,6 +31,9 @@ module.exports = class VishnusBanners extends Plugin {
     }));
     this.registerEvent(this.app.metadataCache.on("changed", refresh));
     this.registerEvent(this.app.vault.on("rename", refresh));
+    // Keep each image's .banner file (invisible in Obsidian) in step with it
+    this.registerEvent(this.app.vault.on("delete", (f) => this.onLibraryImageDeleted(f)));
+    this.registerEvent(this.app.vault.on("rename", (f, oldPath) => this.onLibraryImageRenamed(f, oldPath)));
     this.app.workspace.onLayoutReady(refresh);
 
     this.addCommand({
@@ -99,6 +102,31 @@ module.exports = class VishnusBanners extends Plugin {
     this.lastScan = Date.now();
     await this.loadLibrary();
     this.buildAutoPool();
+  }
+
+  // "<root>/Set/x.banner.jpg" -> "<root>/Set/x.banner", or null if it isn't a library image
+  metaPathFor(imagePath) {
+    const root = (this.libraryConf?.path ?? "Assets/Attachments/Banners") + "/";
+    const m = imagePath.match(/^(.*\.banner)\.[A-Za-z0-9]+$/);
+    return imagePath.startsWith(root) && m ? m[1] : null;
+  }
+
+  async onLibraryImageDeleted(file) {
+    const meta = this.metaPathFor(file.path);
+    if (meta && (await this.app.vault.adapter.exists(meta))) {
+      await this.app.vault.adapter.trashLocal(meta); // into the vault's .trash, recoverable
+      this.lastScan = 0;
+    }
+  }
+
+  async onLibraryImageRenamed(file, oldPath) {
+    const oldMeta = this.metaPathFor(oldPath);
+    if (!oldMeta || !(await this.app.vault.adapter.exists(oldMeta))) return;
+    // New name keeps the codename.banner.<ext> shape: move the metadata with it.
+    // Renamed to something else (or out of the library): leave the metadata where it is.
+    const newMeta = this.metaPathFor(file.path);
+    if (newMeta && !(await this.app.vault.adapter.exists(newMeta))) await this.app.vault.adapter.rename(oldMeta, newMeta);
+    this.lastScan = 0;
   }
 
   // Library: <root>/<Set>/<codename>.banner (metadata) + <codename>.banner.<ext> (image, optional)
