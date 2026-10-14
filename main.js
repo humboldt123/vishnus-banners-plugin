@@ -21,12 +21,14 @@ function hash(str) {
 module.exports = class VishnusBanners extends Plugin {
   async onload() {
     await this.reloadCoversIfChanged();
+    await this.loadPublishRules();
 
     const refresh = () => this.refreshAll();
     this.registerEvent(this.app.workspace.on("layout-change", refresh));
     this.registerEvent(this.app.workspace.on("file-open", async () => {
       await this.reloadCoversIfChanged();
       await this.rescanLibrary();
+      await this.loadPublishRules();
       refresh();
     }));
     this.registerEvent(this.app.metadataCache.on("changed", refresh));
@@ -91,9 +93,10 @@ module.exports = class VishnusBanners extends Plugin {
   // autoSets are folder-name patterns: "Notion *", "Pomological", "*"
   buildAutoPool() {
     const pats = (this.libraryConf.autoSets ?? []).map((p) => new RegExp("^" + p.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$"));
-    const fromLibrary = this.library.filter((e) => e.src && pats.some((re) => re.test(e.set))).map((e) => e.src);
+    const fromLibrary = this.library.filter((e) => e.src && pats.some((re) => re.test(e.set)));
     // Fall back to the plain URL list when the library isn't there (e.g. a fresh device)
-    this.autoPool = fromLibrary.length ? fromLibrary : this.collections.filter((c) => c.auto).flatMap((c) => c.covers);
+    this.autoPool = fromLibrary.length ? fromLibrary
+      : this.collections.filter((c) => c.auto).flatMap((c) => c.covers).map((url) => ({ src: url, meta: { url } }));
   }
 
   // Rescan the library at most every 30s, so banners added or deleted by hand show up
@@ -196,8 +199,46 @@ module.exports = class VishnusBanners extends Plugin {
     return dest instanceof TFile ? this.app.vault.getResourcePath(dest) : null;
   }
 
-  autoCover(file) {
+  autoEntry(file) {
     return this.autoPool.length ? this.autoPool[hash(file.basename) % this.autoPool.length] : null;
+  }
+
+  autoCover(file) {
+    return this.autoEntry(file)?.src ?? null;
+  }
+
+  // Can the wiki show this banner? Needs a public URL, or an image committed to git.
+  isPublic(file) {
+    const own = this.frontmatter(file).banner;
+    const v = typeof own === "string" ? own.trim() : "";
+    const entry = v && v !== "auto" ? this.libraryIndex?.get(v.replace(/^!?\[\[|\]\]$/g, "")) : this.autoEntry(file);
+    if (entry) return !!(entry.meta.url || entry.meta.ingit);
+    return true; // URLs and vault images: the wiki build handles those
+  }
+
+  // wiki-publish.yml: "- path: <glob>" / "action: allow|deny", last match wins, default deny
+  async loadPublishRules() {
+    const p = ".wiki/wiki-publish.yml";
+    this.publishRules = [];
+    if (!(await this.app.vault.adapter.exists(p))) return;
+    let pat = null;
+    for (const line of (await this.app.vault.adapter.read(p)).split("\n")) {
+      if (/^\s*#/.test(line)) continue;
+      const m = line.match(/path:\s*"?([^"]+)"?/);
+      if (m) { pat = m[1].trim(); continue; }
+      const a = line.match(/action:\s*(allow|deny)/);
+      if (a && pat) {
+        const re = pat.replace(/([.+?^${}()|[\]\\])/g, "\\$1").replace(/\*\*/g, "\u0000").replace(/\*/g, "[^/]*").replace(/\u0000/g, ".*");
+        this.publishRules.push({ re: new RegExp("^" + re + "$"), allow: a[1] === "allow" });
+        pat = null;
+      }
+    }
+  }
+
+  isPublished(file) {
+    let ok = false;
+    for (const r of this.publishRules ?? []) if (r.re.test(file.path)) ok = r.allow;
+    return ok;
   }
 
   resolve(file) {
@@ -250,6 +291,15 @@ module.exports = class VishnusBanners extends Plugin {
           if (host.editable) this.addControls(el, view);
         }
         if (el.dataset.repositioning) continue;
+        if (host.editable) {
+          const warn = this.isPublished(view.file) && !this.isPublic(view.file);
+          let badge = el.querySelector(":scope > .vb-warning");
+          if (warn && !badge) {
+            badge = el.createDiv({ cls: "vb-warning", attr: { "aria-label": "This note is on the wiki, but this banner has no public URL and isn't in git, so the wiki will show no banner" } });
+            setIcon(badge.createSpan(), "triangle-alert");
+            badge.createSpan({ text: "Not on wiki" });
+          } else if (!warn) badge?.remove();
+        }
         el.style.backgroundImage = `url("${banner.src}")`;
         el.style.backgroundPosition = `50% ${banner.y}%`;
         // Bleed out to the scroll area's edges (top, left, right), past its padding

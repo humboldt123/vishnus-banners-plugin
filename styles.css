@@ -117,3 +117,21 @@
   object-fit: cover;
   border-radius: var(--radius-s);
 }
+
+/* Published note, banner the wiki can't show */
+.vb-warning {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-on-accent);
+  background: var(--color-orange);
+  border-radius: var(--radius-s);
+  pointer-events: auto;
+}
+.vb-warning svg { width: 14px; height: 14px; }
