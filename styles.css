@@ -1,0 +1,127 @@
+/* Scroll areas become size containers so the banner can span their full width */
+.markdown-source-view .cm-scroller,
+.markdown-reading-view .markdown-preview-view {
+  container-type: inline-size;
+}
+
+.vb-banner {
+  position: relative;
+  width: 100cqw;
+  margin-inline: calc(50% - 50cqw);
+  height: clamp(150px, 22vh, 220px);
+  margin-bottom: 1.5rem;
+  background-size: cover;
+  background-repeat: no-repeat;
+  /* Soft fade into the page over the bottom 40% */
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent);
+  mask-image: linear-gradient(to bottom, black 60%, transparent);
+  user-select: none;
+}
+
+/* Hover controls (edit mode only; reading view gets none) */
+.vb-controls {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.vb-banner:hover .vb-controls,
+.vb-banner.is-repositioning .vb-controls {
+  opacity: 1;
+}
+.vb-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: none;
+  border-radius: var(--radius-s);
+  box-shadow: var(--shadow-s);
+  cursor: pointer;
+  opacity: 0.85;
+}
+.vb-button:hover {
+  opacity: 1;
+}
+.vb-button svg {
+  width: 14px;
+  height: 14px;
+}
+.vb-button.mod-cta {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+
+/* Reposition mode: no fade, so you can see what you're framing */
+.vb-banner.is-repositioning {
+  -webkit-mask-image: none;
+  mask-image: none;
+  cursor: grab;
+}
+.vb-banner.is-repositioning:active {
+  cursor: grabbing;
+}
+.vb-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 4px 10px;
+  font-size: var(--font-ui-small);
+  color: white;
+  background: rgb(0 0 0 / 0.45);
+  border-radius: var(--radius-s);
+  pointer-events: none;
+}
+
+/* Picker */
+.vb-modal {
+  width: min(760px, 92vw);
+}
+.vb-gallery h6 {
+  margin: 1.2em 0 0.5em;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+}
+.vb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+.vb-tile {
+  height: 72px;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: var(--radius-s);
+  box-shadow: none;
+  cursor: pointer;
+}
+.vb-tile:hover,
+.vb-tile.is-selected {
+  border-color: var(--interactive-accent);
+}
+.vb-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.vb-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.vb-suggestion img {
+  width: 64px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: var(--radius-s);
+}

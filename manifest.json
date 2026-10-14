@@ -1,0 +1,9 @@
+{
+  "id": "vishnus-banners",
+  "name": "Vishnu's Banners",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "Notion-style banners for every note: an automatic cover picked from the filename, or your own via frontmatter.",
+  "author": "Vishnu",
+  "isDesktopOnly": false
+}
