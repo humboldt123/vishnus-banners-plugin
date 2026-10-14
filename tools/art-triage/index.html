@@ -223,7 +223,16 @@ function openComment(key, label, src) {
     b.hidden = current || (b.dataset.bin === "" && key.startsWith("group:") && filesFor(key).every((f) => !state.bins[f]));
   }
   document.getElementById("comment-img").src = src;
-  document.getElementById("comment-label").textContent = label;
+  const fd = catalog.found?.[key];
+  document.getElementById("comment-label").innerHTML = "";
+  document.getElementById("comment-label").append(label);
+  if (fd) {
+    const div = document.createElement("div");
+    div.style.cssText = "margin-top:6px;color:var(--gold)";
+    div.textContent = "Found: " + fd.note + " ";
+    if (fd.url) { const l = document.createElement("a"); l.href = fd.url; l.target = "_blank"; l.textContent = "open"; l.style.color = "var(--accent)"; div.append(l); }
+    document.getElementById("comment-label").append(div);
+  }
   document.getElementById("comment-text").value = state.comments[key] ?? "";
   document.getElementById("comment").showModal();
   document.getElementById("comment-text").focus();
