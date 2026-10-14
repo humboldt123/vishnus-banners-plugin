@@ -17,11 +17,14 @@ function hash(str) {
 
 module.exports = class VishnusBanners extends Plugin {
   async onload() {
-    await this.loadCovers();
+    await this.reloadCoversIfChanged();
 
     const refresh = () => this.refreshAll();
     this.registerEvent(this.app.workspace.on("layout-change", refresh));
-    this.registerEvent(this.app.workspace.on("file-open", refresh));
+    this.registerEvent(this.app.workspace.on("file-open", async () => {
+      await this.reloadCoversIfChanged();
+      refresh();
+    }));
     this.registerEvent(this.app.metadataCache.on("changed", refresh));
     this.registerEvent(this.app.vault.on("rename", refresh));
     this.app.workspace.onLayoutReady(refresh);
@@ -50,6 +53,15 @@ module.exports = class VishnusBanners extends Plugin {
   onunload() {
     this.resizeObserver?.disconnect();
     document.querySelectorAll(".vb-banner").forEach((el) => el.remove());
+  }
+
+  // covers.json lives in the plugin folder, outside vault events: check its mtime instead
+  async reloadCoversIfChanged() {
+    const stat = await this.app.vault.adapter.stat(`${this.manifest.dir}/covers.json`);
+    if (stat && stat.mtime !== this.coversMtime) {
+      this.coversMtime = stat.mtime;
+      await this.loadCovers();
+    }
   }
 
   async loadCovers() {
