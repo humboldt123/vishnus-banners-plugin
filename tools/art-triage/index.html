@@ -64,6 +64,8 @@
   dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
   button { background: var(--border); color: var(--text); border: 0; border-radius: 4px; padding: 6px 12px; font: inherit; cursor: pointer; }
   button.primary { background: var(--accent); color: #1c1a18; }
+  button.move[data-bin="trash"] { color: var(--trash); }
+  button.move[data-bin="find"] { color: var(--find); }
   #lightbox { width: auto; max-width: 92vw; padding: 8px; }
   #lightbox img { max-height: 86vh; max-width: 90vw; margin: 0; }
 </style>
@@ -71,7 +73,7 @@
 <body>
 <header>
   <h1>Art Triage</h1>
-  <span class="hint">Click to view &amp; comment · drag to Trash or Find · drag back to Unsorted to undo</span>
+  <span class="hint">Click an image to view, comment, or move it · or drag to Trash / Find</span>
   <span class="saved" id="saved"></span>
 </header>
 <div class="layout">
@@ -91,7 +93,13 @@
   <img id="comment-img" alt="">
   <div class="label" id="comment-label"></div>
   <textarea id="comment-text" placeholder="e.g. I think this is called … let's use it / just use this png as is"></textarea>
-  <div class="row"><button id="comment-cancel">Cancel</button><button class="primary" id="comment-save">Save</button></div>
+  <div class="row">
+    <button class="move" data-bin="trash">Move to Trash</button>
+    <button class="move" data-bin="find">Move to Find</button>
+    <button class="move" data-bin="">Back to Unsorted</button>
+    <span style="flex:1"></span>
+    <button id="comment-cancel">Cancel</button><button class="primary" id="comment-save">Save</button>
+  </div>
 </dialog>
 
 <script>
@@ -206,8 +214,14 @@ document.querySelectorAll(".drop").forEach((d) => makeDropTarget(d, d.dataset.bi
 makeDropTarget(document.getElementById("unsorted"), null);
 
 let commentKey = null;
+// Files a dialog acts on: one image, or every copy in a Matched card
+const filesFor = (key) => key.startsWith("group:") ? catalog.matched.find((g) => `group:${g.title}` === key)?.files ?? [] : [key];
 function openComment(key, label, src) {
   commentKey = key;
+  for (const b of document.querySelectorAll("button.move")) {
+    const current = filesFor(key).every((f) => (state.bins[f] ?? "") === b.dataset.bin);
+    b.hidden = current || (b.dataset.bin === "" && key.startsWith("group:") && filesFor(key).every((f) => !state.bins[f]));
+  }
   document.getElementById("comment-img").src = src;
   document.getElementById("comment-label").textContent = label;
   document.getElementById("comment-text").value = state.comments[key] ?? "";
@@ -219,6 +233,16 @@ document.getElementById("comment-save").onclick = () => {
   if (v) state.comments[commentKey] = v; else delete state.comments[commentKey];
   document.getElementById("comment").close(); save(); render();
 };
+for (const b of document.querySelectorAll("button.move")) {
+  b.onclick = () => {
+    const v = document.getElementById("comment-text").value.trim();
+    if (v) state.comments[commentKey] = v; else delete state.comments[commentKey];
+    for (const f of filesFor(commentKey)) {
+      if (b.dataset.bin) state.bins[f] = b.dataset.bin; else delete state.bins[f];
+    }
+    document.getElementById("comment").close(); save(); render();
+  };
+}
 document.getElementById("comment-cancel").onclick = () => document.getElementById("comment").close();
 document.getElementById("comment-text").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) document.getElementById("comment-save").click();
