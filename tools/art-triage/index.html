@@ -147,7 +147,7 @@ function render() {
     el.querySelector(".title").textContent = g.title;
     el.querySelector(".meta").innerHTML = g.original
       ? `Original ${g.originalRes} · <a href="${g.original}" target="_blank" rel="noopener">open</a> · your copy is lower-res`
-      : "No original found yet";
+      : (g.note ?? "No original found yet");
     for (const f of g.files) {
       const im = document.createElement("img");
       im.loading = "lazy"; im.src = img(f); im.draggable = true; im.title = f;
