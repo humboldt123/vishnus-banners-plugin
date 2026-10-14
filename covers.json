@@ -157,16 +157,10 @@
     }
   ],
   "library": {
-    "_comment": "Banner library folder, and which of its sets feed automatic covers",
+    "_comment": "Banner library folder. autoSets: folder-name patterns (* = anything) whose banners feed automatic covers. Add, rename or delete set folders freely.",
     "path": "Assets/Attachments/Banners",
     "autoSets": [
-      "Notion Artemis II",
-      "Notion NASA Archive",
-      "Notion James Webb Telescope",
-      "Notion MET",
-      "Notion MET Japanese Prints",
-      "Notion Rijksmuseum",
-      "Notion USDA Pomological Watercolors"
+      "Notion *"
     ]
   }
 }

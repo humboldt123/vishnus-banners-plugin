@@ -26,6 +26,7 @@ module.exports = class VishnusBanners extends Plugin {
     this.registerEvent(this.app.workspace.on("layout-change", refresh));
     this.registerEvent(this.app.workspace.on("file-open", async () => {
       await this.reloadCoversIfChanged();
+      await this.rescanLibrary();
       refresh();
     }));
     this.registerEvent(this.app.metadataCache.on("changed", refresh));
@@ -81,10 +82,23 @@ module.exports = class VishnusBanners extends Plugin {
     this.autoRules = data?.auto ?? {};
     this.libraryConf = data?.library ?? {};
     await this.loadLibrary();
-    const sets = this.libraryConf.autoSets ?? [];
-    const fromLibrary = this.library.filter((e) => sets.includes(e.set) && e.src).map((e) => e.src);
+    this.buildAutoPool();
+  }
+
+  // autoSets are folder-name patterns: "Notion *", "Pomological", "*"
+  buildAutoPool() {
+    const pats = (this.libraryConf.autoSets ?? []).map((p) => new RegExp("^" + p.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$"));
+    const fromLibrary = this.library.filter((e) => e.src && pats.some((re) => re.test(e.set))).map((e) => e.src);
     // Fall back to the plain URL list when the library isn't there (e.g. a fresh device)
     this.autoPool = fromLibrary.length ? fromLibrary : this.collections.filter((c) => c.auto).flatMap((c) => c.covers);
+  }
+
+  // Rescan the library at most every 30s, so banners added or deleted by hand show up
+  async rescanLibrary() {
+    if (Date.now() - (this.lastScan ?? 0) < 30000) return;
+    this.lastScan = Date.now();
+    await this.loadLibrary();
+    this.buildAutoPool();
   }
 
   // Library: <root>/<Set>/<codename>.banner (metadata) + <codename>.banner.<ext> (image, optional)
