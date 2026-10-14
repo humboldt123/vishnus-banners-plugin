@@ -38,7 +38,17 @@ module.exports = class VishnusBanners extends Plugin {
     });
   }
 
+  // Re-fit banners when a pane is resized
+  observe(scroller) {
+    this.observed ??= new WeakSet();
+    if (this.observed.has(scroller)) return;
+    this.observed.add(scroller);
+    this.resizeObserver ??= new ResizeObserver(() => this.refreshAll());
+    this.resizeObserver.observe(scroller);
+  }
+
   onunload() {
+    this.resizeObserver?.disconnect();
     document.querySelectorAll(".vb-banner").forEach((el) => el.remove());
   }
 
@@ -117,12 +127,17 @@ module.exports = class VishnusBanners extends Plugin {
         if (el.dataset.repositioning) continue;
         el.style.backgroundImage = `url("${banner.src}")`;
         el.style.backgroundPosition = `50% ${banner.y}%`;
-        // Pull the banner up to the top edge of the scroll area
+        // Bleed out to the scroll area's edges (top, left, right), past its padding
         const scroller = host.el.closest(".cm-scroller, .markdown-preview-view");
         if (scroller && el.offsetParent) {
-          el.style.marginTop = "0px";
-          const gap = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
-          el.style.marginTop = `-${gap}px`;
+          this.observe(scroller);
+          el.style.margin = "0 0 1.5rem 0";
+          el.style.width = "";
+          const s = scroller.getBoundingClientRect();
+          const b = el.getBoundingClientRect();
+          el.style.marginTop = `-${b.top - s.top - scroller.clientTop + scroller.scrollTop}px`;
+          el.style.marginLeft = `-${b.left - s.left - scroller.clientLeft}px`;
+          el.style.width = `${scroller.clientWidth}px`;
         }
       }
     });

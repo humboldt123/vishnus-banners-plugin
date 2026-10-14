@@ -1,15 +1,7 @@
-/* Scroll areas become size containers so the banner can span their full width */
-.markdown-source-view .cm-scroller,
-.markdown-reading-view .markdown-preview-view {
-  container-type: inline-size;
-}
-
 .vb-banner {
   position: relative;
-  width: 100cqw;
-  margin-inline: calc(50% - 50cqw);
   height: clamp(150px, 22vh, 220px);
-  margin-bottom: 1.5rem;
+  max-width: none;
   background-size: cover;
   background-repeat: no-repeat;
   /* Soft fade into the page over the bottom 40% */
