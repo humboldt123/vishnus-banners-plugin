@@ -21,7 +21,7 @@
   h2 span { color: var(--text); }
 
   .matched { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
-  .group { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+  .group { cursor: pointer; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
   .group.in-trash { opacity: .35; }
   .group .title { font-weight: 600; margin-bottom: 2px; }
   .group .meta { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
@@ -52,9 +52,9 @@
   .zone .empty { grid-column: 1 / -1; color: var(--muted); font-size: 12px; text-align: center; padding: 24px 8px; }
   #unsorted.over { outline: 2px dashed var(--accent); outline-offset: 6px; border-radius: 6px; }
 
-  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; width: min(560px, 92vw); padding: 16px; }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; width: min(900px, 94vw); padding: 16px; }
   dialog::backdrop { background: rgb(0 0 0 / .6); }
-  dialog img { max-width: 100%; max-height: 260px; display: block; margin: 0 auto 12px; border-radius: 4px; }
+  dialog img { max-width: 100%; max-height: 60vh; display: block; margin: 0 auto 12px; border-radius: 4px; }
   dialog .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; word-break: break-all; }
   dialog textarea { width: 100%; min-height: 90px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 8px; font: inherit; }
   dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
@@ -67,7 +67,7 @@
 <body>
 <header>
   <h1>Art Triage</h1>
-  <span class="hint">Drag images to Trash or Find · right-click to comment · double-click to enlarge · drag back to Unsorted to undo</span>
+  <span class="hint">Click to view &amp; comment · drag to Trash or Find · drag back to Unsorted to undo</span>
   <span class="saved" id="saved"></span>
 </header>
 <div class="layout">
@@ -89,7 +89,6 @@
   <textarea id="comment-text" placeholder="e.g. I think this is called … let's use it / just use this png as is"></textarea>
   <div class="row"><button id="comment-cancel">Cancel</button><button class="primary" id="comment-save">Save</button></div>
 </dialog>
-<dialog id="lightbox"><img id="lightbox-img" alt=""></dialog>
 
 <script>
 const img = (p) => `/img?p=${encodeURIComponent(p)}`;
@@ -130,8 +129,7 @@ function tile(p) {
   im.onload = () => { const s = document.createElement("span"); s.className = "size"; s.textContent = `${im.naturalWidth}×${im.naturalHeight}`; el.append(s); };
   el.append(im);
   el.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/plain", p));
-  el.addEventListener("contextmenu", (e) => { e.preventDefault(); openComment(p, p, img(p)); });
-  el.addEventListener("dblclick", () => { document.getElementById("lightbox-img").src = img(p); document.getElementById("lightbox").showModal(); });
+  el.addEventListener("click", () => openComment(p, p, img(p)));
   return el;
 }
 
@@ -152,10 +150,9 @@ function render() {
       const im = document.createElement("img");
       im.loading = "lazy"; im.src = img(f); im.draggable = true; im.title = f;
       im.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/plain", f));
-      im.addEventListener("dblclick", () => { document.getElementById("lightbox-img").src = img(f); document.getElementById("lightbox").showModal(); });
       el.querySelector(".thumbs").append(im);
     }
-    el.addEventListener("contextmenu", (e) => { e.preventDefault(); openComment(key, g.title, img(g.files[0])); });
+    el.addEventListener("click", () => openComment(key, g.title, img(g.files[0])));
     return el;
   }));
   document.getElementById("matched-count").textContent = catalog.matched.length;
@@ -183,7 +180,7 @@ function makeDropTarget(el, bin) {
     if (!p) return;
     if (bin) state.bins[p] = bin; else delete state.bins[p];
     save(); render();
-    if (bin === "find") openComment(p, p, img(p));
+    if (bin === "find" && !state.comments[p]) openComment(p, p, img(p));
   });
 }
 document.querySelectorAll(".drop").forEach((d) => makeDropTarget(d, d.dataset.bin));
@@ -207,7 +204,6 @@ document.getElementById("comment-cancel").onclick = () => document.getElementByI
 document.getElementById("comment-text").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) document.getElementById("comment-save").click();
 });
-document.getElementById("lightbox").addEventListener("click", (e) => e.currentTarget.close());
 
 load();
 </script>
