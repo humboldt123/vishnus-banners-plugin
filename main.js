@@ -249,7 +249,9 @@ module.exports = class VishnusBanners extends Plugin {
     const src = own === "auto" ? this.autoCover(file)
       : own ? this.toSrc(value, file)
       : this.wantsAuto(file) ? this.autoCover(file) : null;
-    const entry = own && this.libraryIndex?.get(own);
+    // Library entry behind this banner (picked by hand, or the automatic one) for its default crop
+    const entry = own && own !== "auto" ? this.libraryIndex?.get(own.replace(/^!?\[\[|\]\]$/g, ""))
+      : (own === "auto" || (!own && this.wantsAuto(file))) ? this.autoEntry(file) : null;
     let y = parseFloat(fm.banner_y ?? fm["banner-y"] ?? entry?.meta?.crop?.y);
     if (isNaN(y)) y = 50;
     else if (y <= 1) y *= 100; // old Banners plugin stored 0–1
