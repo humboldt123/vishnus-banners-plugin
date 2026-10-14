@@ -18,6 +18,9 @@ function hash(str) {
   return h >>> 0;
 }
 
+// Automatic picks only use banners the wiki can also show, so both always agree
+const isPublicEntry = (e) => !!(e.meta.url || e.meta.ingit);
+
 module.exports = class VishnusBanners extends Plugin {
   async onload() {
     await this.reloadCoversIfChanged();
@@ -95,7 +98,7 @@ module.exports = class VishnusBanners extends Plugin {
   buildAutoPool() {
     const pats = (this.libraryConf.autoSets ?? []).map((p) => new RegExp("^" + p.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$"));
     // Membership comes from .banner files alone (committed everywhere), not from whether an image is present
-    const fromLibrary = this.library.filter((e) => pats.some((re) => re.test(e.set)));
+    const fromLibrary = this.library.filter((e) => isPublicEntry(e) && pats.some((re) => re.test(e.set)));
     // Fall back to the plain URL list when the library isn't there (e.g. a fresh device)
     this.autoPool = fromLibrary.length ? fromLibrary
       : this.collections.filter((c) => c.auto).flatMap((c) => c.covers).map((url) => ({ src: url, meta: { url } }));
@@ -235,7 +238,7 @@ module.exports = class VishnusBanners extends Plugin {
     for (const rule of this.rules ?? []) {
       if (!rule.tags?.length || !this.ruleMatches(rule, file)) continue;
       if ((hash(file.basename + ":" + rule.name) % 1000) >= (rule.share ?? 1) * 1000) continue;
-      const pool = this.library.filter((e) => (e.meta.tags ?? []).some((t) => rule.tags.includes(t)));
+      const pool = this.library.filter((e) => isPublicEntry(e) && (e.meta.tags ?? []).some((t) => rule.tags.includes(t)));
       if (pool.length) return pool[hash(file.basename) % pool.length];
     }
     return this.autoPool.length ? this.autoPool[hash(file.basename) % this.autoPool.length] : null;
