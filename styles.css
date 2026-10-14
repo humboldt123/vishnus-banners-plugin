@@ -135,3 +135,27 @@
   pointer-events: auto;
 }
 .vb-warning svg { width: 14px; height: 14px; }
+
+/* Grid pattern banner: thin diagonal lines, ink-coloured in light mode, white in dark */
+.vb-banner.vb-pattern { background-image: none; }
+.vb-banner.vb-pattern::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: var(--vb-line, rgb(0 0 0 / 0.22));
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Cpath d='M0 14 L14 0 L28 14 L14 28 Z' fill='none' stroke='black' stroke-width='1'/%3E%3C/svg%3E") repeat center / 28px 28px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Cpath d='M0 14 L14 0 L28 14 L14 28 Z' fill='none' stroke='black' stroke-width='1'/%3E%3C/svg%3E") repeat center / 28px 28px;
+  pointer-events: none;
+}
+.theme-dark .vb-banner.vb-pattern { --vb-line: rgb(255 255 255 / 0.16); }
+.vb-pattern-tile { position: relative; }
+.vb-pattern-tile .vb-banner { position: absolute; inset: 0; height: auto; margin: 0; -webkit-mask-image: none; mask-image: none; }
+/* Local-only banners in the picker */
+.vb-tile.is-local { position: relative; }
+.vb-tile.is-local::after {
+  content: "⌂";
+  position: absolute; top: 3px; right: 4px;
+  padding: 0 4px; border-radius: 3px;
+  font-size: 12px; color: white; background: var(--color-orange);
+}
+.vb-legend { margin: 4px 0 8px; font-size: var(--font-ui-smaller); color: var(--text-muted); }

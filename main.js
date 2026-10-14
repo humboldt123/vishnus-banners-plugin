@@ -3,7 +3,8 @@ const { Plugin, MarkdownView, TFile, Modal, FuzzySuggestModal, Setting, Notice, 
 // Frontmatter:
 //   banner: <Set/codename>                       a banner from the library (Assets/Attachments/Banners)
 //   banner: <url | [[image]] | vault/path.jpg>   use this image
-//   banner: auto                                 automatic cover, even outside the auto folders
+//   banner: pattern:grid                         the plain grid pattern (also the default for older notes)
+//   banner: auto                                 pick by the rules now, even outside the auto folders
 //   banner: none                                 no banner
 //   banner_y: 0–100                                      vertical crop position (also reads banner-y)
 
@@ -30,6 +31,8 @@ const isPublicEntry = (e) => !!(e.meta.url || e.meta.ingit);
 
 module.exports = class VishnusBanners extends Plugin {
   async onload() {
+    const saved = (await this.loadData()) ?? {};
+    this.pending = new Set(saved.pending ?? []);
     await this.reloadCoversIfChanged();
     await this.loadPublishRules();
 
@@ -46,7 +49,18 @@ module.exports = class VishnusBanners extends Plugin {
     // Keep each image's .banner file (invisible in Obsidian) in step with it
     this.registerEvent(this.app.vault.on("delete", (f) => this.onLibraryImageDeleted(f)));
     this.registerEvent(this.app.vault.on("rename", (f, oldPath) => this.onLibraryImageRenamed(f, oldPath)));
-    this.app.workspace.onLayoutReady(refresh);
+    this.app.workspace.onLayoutReady(() => {
+      refresh();
+      // Only notes created from here on get a picked banner written into them (older notes keep the pattern)
+      this.registerEvent(this.app.vault.on("create", (f) => {
+        if (f instanceof TFile && f.extension === "md") {
+          this.pending.add(f.path);
+          this.savePending();
+          setTimeout(() => this.assignPending(), 2500); // after Daily Notes + Templater have filled the template
+        }
+      }));
+      this.registerEvent(this.app.metadataCache.on("changed", () => this.assignPending()));
+    });
 
     this.addCommand({
       id: "change-banner",
@@ -58,6 +72,32 @@ module.exports = class VishnusBanners extends Plugin {
         return true;
       },
     });
+  }
+
+  savePending() {
+    return this.saveData({ pending: [...this.pending] });
+  }
+
+  // New notes that now qualify (right folder, enough words) and still have no banner get one picked by the rules.
+  // Written into frontmatter, so it's just a normal choice the user can change.
+  async assignPending() {
+    if (this.assigning || !this.pending.size) return;
+    this.assigning = true;
+    try {
+      for (const p of [...this.pending]) {
+        const file = this.app.vault.getAbstractFileByPath(p);
+        if (!(file instanceof TFile)) { this.pending.delete(p); continue; }
+        const fm = this.frontmatter(file);
+        if (fm.banner !== undefined) { this.pending.delete(p); continue; }
+        if (!this.wantsAuto(file)) continue; // e.g. a note still under the word minimum: check again later
+        const entry = this.autoEntry(file);
+        this.pending.delete(p);
+        if (entry?.key) await this.app.fileManager.processFrontMatter(file, (f) => { f.banner ??= entry.key; });
+      }
+    } finally {
+      this.assigning = false;
+      await this.savePending();
+    }
   }
 
   // Re-fit banners when a pane is resized
@@ -270,6 +310,7 @@ module.exports = class VishnusBanners extends Plugin {
   isPublic(file) {
     const own = this.frontmatter(file).banner;
     const v = typeof own === "string" ? own.trim() : "";
+    if (!v || v === "pattern:grid") return true;
     const entry = v && v !== "auto" ? this.libraryIndex?.get(v.replace(/^!?\[\[|\]\]$/g, "")) : this.autoEntry(file);
     if (entry) return !!(entry.meta.url || entry.meta.ingit);
     return true; // URLs and vault images: the wiki build handles those
@@ -305,12 +346,11 @@ module.exports = class VishnusBanners extends Plugin {
     const value = fm.banner;
     if (value === "none" || value === false) return null;
     const own = typeof value === "string" && value.trim();
-    const src = own === "auto" ? this.autoCover(file)
-      : own ? this.toSrc(value, file)
-      : this.wantsAuto(file) ? this.autoCover(file) : null;
+    if (own === "pattern:grid" || (!own && this.wantsAuto(file))) return { pattern: "grid" };
+    const src = own === "auto" ? this.autoCover(file) : own ? this.toSrc(value, file) : null;
     // Library entry behind this banner (picked by hand, or the automatic one) for its default crop
     const entry = own && own !== "auto" ? this.libraryIndex?.get(own.replace(/^!?\[\[|\]\]$/g, ""))
-      : (own === "auto" || (!own && this.wantsAuto(file))) ? this.autoEntry(file) : null;
+      : own === "auto" ? this.autoEntry(file) : null;
     let y = parseFloat(fm.banner_y ?? fm["banner-y"] ?? entry?.meta?.crop?.y);
     if (isNaN(y)) y = 50;
     else if (y <= 1) y *= 100; // old Banners plugin stored 0–1
@@ -361,8 +401,9 @@ module.exports = class VishnusBanners extends Plugin {
             badge.createSpan({ text: "Not on wiki" });
           } else if (!warn) badge?.remove();
         }
-        el.style.backgroundImage = `url("${banner.src}")`;
-        el.style.backgroundPosition = `50% ${banner.y}%`;
+        el.toggleClass("vb-pattern", !!banner.pattern);
+        el.style.backgroundImage = banner.pattern ? "" : `url("${banner.src}")`;
+        el.style.backgroundPosition = banner.pattern ? "" : `50% ${banner.y}%`;
         // Bleed out to the scroll area's edges (top, left, right), past its padding
         const scroller = host.el.closest(".cm-scroller, .markdown-preview-view");
         if (scroller && el.offsetParent) {
@@ -485,6 +526,13 @@ class BannerModal extends Modal {
 
     // Library sets, one heading each
     const gallery = contentEl.createDiv({ cls: "vb-gallery" });
+    gallery.createEl("h6", { text: "Pattern" });
+    const pgrid = gallery.createDiv({ cls: "vb-grid" });
+    const ptile = pgrid.createEl("button", { cls: "vb-tile vb-pattern-tile", attr: { title: "Grid pattern" } });
+    ptile.createDiv({ cls: "vb-banner vb-pattern" });
+    if (current === "pattern:grid" || current === undefined) ptile.addClass("is-selected");
+    ptile.addEventListener("click", () => choose("pattern:grid"));
+    gallery.createDiv({ cls: "vb-legend", text: "Tiles marked ⌂ are local only: no public URL and not in git, so they won't show on the wiki." });
     const sets = [...new Set(plugin.library.map((e) => e.set))].sort();
     for (const set of sets) {
       gallery.createEl("h6", { text: set });
@@ -493,6 +541,10 @@ class BannerModal extends Modal {
         const tile = grid.createEl("button", { cls: "vb-tile", attr: { title: e.meta.title ?? e.code } });
         tile.createEl("img", { attr: { src: e.src, loading: "lazy", alt: "" } });
         if (e.key === current) tile.addClass("is-selected");
+        if (!isPublicEntry(e)) {
+          tile.addClass("is-local");
+          tile.setAttr("title", `${e.meta.title ?? e.code}: local only, won't show on the wiki`);
+        }
         tile.addEventListener("click", () => choose(e.key));
       }
     }
