@@ -1,7 +1,7 @@
 {
   "_comment": "Banner pools. Notes without a `banner:` get a cover from every collection with auto=true, picked by hashing the filename.",
   "auto": {
-    "_comment": "Automatic covers only for Markdown notes in these folders. `banner: auto` turns one on anywhere; `banner: none` turns it off; any other `banner:` value is used as-is.",
+    "_comment": "Every Markdown note shows the dot pattern unless it has a banner, says banner: none, or sits in noBanner. New notes in `folders` (with enough words where minWords applies) get a rule-picked banner written into them.",
     "folders": [
       "Notes/",
       "Logs/",
@@ -9,7 +9,11 @@
     ],
     "minWords": {
       "Notes/": 500
-    }
+    },
+    "noBanner": [
+      "People/",
+      "templates/"
+    ]
   },
   "collections": [
     {

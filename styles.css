@@ -152,13 +152,6 @@
 .vb-pattern-tile .vb-banner { position: absolute; inset: 0; height: auto; margin: 0; -webkit-mask-image: none; mask-image: none; }
 /* Local-only banners in the picker */
 .vb-tile.is-local { position: relative; }
-.vb-tile.is-local::after {
-  content: "⌂";
-  position: absolute; top: 3px; right: 4px;
-  padding: 0 4px; border-radius: 3px;
-  font-size: 12px; color: white; background: var(--color-orange);
-}
-.vb-legend { margin: 4px 0 8px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 
 /* Patterns: drawn as a mask over the text colour, so they follow light/dark mode.
    pattern:grid (default) = isometric dots; pattern:triangles = triangle lattice */
@@ -170,3 +163,9 @@
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='58.890'%3E%3Cg stroke='black' stroke-width='1' fill='none'%3E%3Cpath d='M0 0 L17 29.445 L0 58.890 M34 0 L17 29.445 L34 58.890 M0 0 H34 M0 29.445 H34 M0 58.890 H34'/%3E%3C/g%3E%3C/svg%3E") repeat center / 34px 58.890px;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='58.890'%3E%3Cg stroke='black' stroke-width='1' fill='none'%3E%3Cpath d='M0 0 L17 29.445 L0 58.890 M34 0 L17 29.445 L34 58.890 M0 0 H34 M0 29.445 H34 M0 58.890 H34'/%3E%3C/g%3E%3C/svg%3E") repeat center / 34px 58.890px;
 }
+.vb-local-icon {
+  position: absolute; top: 4px; right: 4px;
+  display: inline-flex; padding: 3px; border-radius: 4px;
+  color: white; background: var(--color-orange);
+}
+.vb-local-icon svg { width: 12px; height: 12px; }

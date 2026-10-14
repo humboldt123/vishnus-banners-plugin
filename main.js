@@ -3,8 +3,7 @@ const { Plugin, MarkdownView, TFile, Modal, FuzzySuggestModal, Setting, Notice, 
 // Frontmatter:
 //   banner: <Set/codename>                       a banner from the library (Assets/Attachments/Banners)
 //   banner: <url | [[image]] | vault/path.jpg>   use this image
-//   banner: pattern:grid                         isometric dot pattern (also the default for older notes)
-//   banner: pattern:triangles                    triangle-lattice pattern
+//   banner: pattern:grid                         isometric dot pattern (the default for every note without a banner)
 //   banner: auto                                 pick by the rules now, even outside the auto folders
 //   banner: none                                 no banner
 //   banner_y: 0–100                                      vertical crop position (also reads banner-y)
@@ -233,6 +232,13 @@ module.exports = class VishnusBanners extends Plugin {
     return null;
   }
 
+  // Every Markdown note gets the dot pattern unless it's in a no-banner folder (People, templates…),
+  // so the banner space is always there
+  wantsPattern(file) {
+    if (file.extension !== "md") return false;
+    return !(this.autoRules.noBanner ?? []).some((f) => file.path.startsWith(f));
+  }
+
   // Whether a note without its own `banner:` gets an automatic cover
   wantsAuto(file) {
     if (file.extension !== "md") return false;
@@ -348,8 +354,7 @@ module.exports = class VishnusBanners extends Plugin {
     const value = fm.banner;
     if (value === "none" || value === false) return null;
     const own = typeof value === "string" && value.trim();
-    if (own === "pattern:triangles") return { pattern: "triangles" };
-    if (own === "pattern:grid" || (!own && this.wantsAuto(file))) return { pattern: "grid" };
+    if (own === "pattern:grid" || (!own && this.wantsPattern(file))) return { pattern: "grid" };
     const src = own === "auto" ? this.autoCover(file) : own ? this.toSrc(value, file) : null;
     // Library entry behind this banner (picked by hand, or the automatic one) for its default crop
     const entry = own && own !== "auto" ? this.libraryIndex?.get(own.replace(/^!?\[\[|\]\]$/g, ""))
@@ -405,7 +410,6 @@ module.exports = class VishnusBanners extends Plugin {
           } else if (!warn) badge?.remove();
         }
         el.toggleClass("vb-pattern", !!banner.pattern);
-        el.toggleClass("vb-pattern-triangles", banner.pattern === "triangles");
         el.style.backgroundImage = banner.pattern ? "" : `url("${banner.src}")`;
         el.style.backgroundPosition = banner.pattern ? "" : `50% ${banner.y}%`;
         // Bleed out to the scroll area's edges (top, left, right), past its padding
@@ -532,13 +536,10 @@ class BannerModal extends Modal {
     const gallery = contentEl.createDiv({ cls: "vb-gallery" });
     gallery.createEl("h6", { text: "Pattern" });
     const pgrid = gallery.createDiv({ cls: "vb-grid" });
-    for (const [value, label, extra] of [["pattern:grid", "Isometric dots", ""], ["pattern:triangles", "Triangle lattice", " vb-pattern-triangles"]]) {
-      const ptile = pgrid.createEl("button", { cls: "vb-tile vb-pattern-tile", attr: { title: label } });
-      ptile.createDiv({ cls: "vb-banner vb-pattern" + extra });
-      if (current === value || (value === "pattern:grid" && current === undefined)) ptile.addClass("is-selected");
-      ptile.addEventListener("click", () => choose(value));
-    }
-    gallery.createDiv({ cls: "vb-legend", text: "Tiles marked ⌂ are local only: no public URL and not in git, so they won't show on the wiki." });
+    const ptile = pgrid.createEl("button", { cls: "vb-tile vb-pattern-tile", attr: { title: "Dots (no picture)" } });
+    ptile.createDiv({ cls: "vb-banner vb-pattern" });
+    if (current === "pattern:grid" || current === undefined) ptile.addClass("is-selected");
+    ptile.addEventListener("click", () => choose("pattern:grid"));
     const sets = [...new Set(plugin.library.map((e) => e.set))].sort();
     for (const set of sets) {
       gallery.createEl("h6", { text: set });
@@ -550,6 +551,7 @@ class BannerModal extends Modal {
         if (!isPublicEntry(e)) {
           tile.addClass("is-local");
           tile.setAttr("title", `${e.meta.title ?? e.code}: local only, won't show on the wiki`);
+          setIcon(tile.createSpan({ cls: "vb-local-icon" }), "hard-drive");
         }
         tile.addEventListener("click", () => choose(e.key));
       }
