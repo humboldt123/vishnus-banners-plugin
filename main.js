@@ -89,6 +89,7 @@ module.exports = class VishnusBanners extends Plugin {
         if (!(file instanceof TFile)) { this.pending.delete(p); continue; }
         const fm = this.frontmatter(file);
         if (fm.banner !== undefined) { this.pending.delete(p); continue; }
+        if (!(this.autoRules.folders ?? []).some((f) => file.path.startsWith(f))) { this.pending.delete(p); continue; }
         if (!this.wantsAuto(file)) continue; // e.g. a note still under the word minimum: check again later
         const entry = this.autoEntry(file);
         this.pending.delete(p);
