@@ -53,14 +53,46 @@ module.exports = class VishnusBanners extends Plugin {
   }
 
   async loadCovers() {
+    this.wordCache = new Map();
+    this.pendingCounts = new Set();
+    let data = null;
     try {
-      const data = JSON.parse(await this.app.vault.adapter.read(`${this.manifest.dir}/covers.json`));
+      data = JSON.parse(await this.app.vault.adapter.read(`${this.manifest.dir}/covers.json`));
       this.collections = data.collections ?? [];
     } catch (e) {
       console.error("Vishnu's Banners: couldn't read covers.json", e);
       this.collections = [];
     }
     this.autoPool = this.collections.filter((c) => c.auto).flatMap((c) => c.covers);
+    this.autoRules = data?.auto ?? {};
+  }
+
+  // Word count (frontmatter excluded), cached by mtime; null until first read
+  words(file) {
+    const hit = this.wordCache.get(file.path);
+    if (hit && hit.mtime === file.stat.mtime) return hit.words;
+    if (!this.pendingCounts.has(file.path)) {
+      this.pendingCounts.add(file.path);
+      this.app.vault.cachedRead(file).then((text) => {
+        const body = text.replace(/^---\n[\s\S]*?\n---\n?/, "");
+        this.wordCache.set(file.path, { mtime: file.stat.mtime, words: body.split(/\s+/).filter(Boolean).length });
+        this.pendingCounts.delete(file.path);
+        this.refreshAll();
+      });
+    }
+    return null;
+  }
+
+  // Whether a note without its own `banner:` gets an automatic cover
+  wantsAuto(file) {
+    const { skipFolders = [], minWords = {} } = this.autoRules;
+    if (skipFolders.some((f) => file.path.startsWith(f))) return false;
+    for (const [folder, min] of Object.entries(minWords)) {
+      if (!file.path.startsWith(folder)) continue;
+      const n = this.words(file);
+      return n !== null && n >= min;
+    }
+    return true;
   }
 
   frontmatter(file) {
@@ -83,7 +115,8 @@ module.exports = class VishnusBanners extends Plugin {
     const fm = this.frontmatter(file);
     const value = fm.banner;
     if (value === "none" || value === false) return null;
-    const src = typeof value === "string" && value.trim() ? this.toSrc(value, file) : this.autoCover(file);
+    const own = typeof value === "string" && value.trim();
+    const src = own ? this.toSrc(value, file) : this.wantsAuto(file) ? this.autoCover(file) : null;
     let y = parseFloat(fm.banner_y ?? fm["banner-y"]);
     if (isNaN(y)) y = 50;
     else if (y <= 1) y *= 100; // old Banners plugin stored 0–1

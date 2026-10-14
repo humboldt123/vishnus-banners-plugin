@@ -1,5 +1,14 @@
 {
   "_comment": "Banner pools. Notes without a `banner:` get a cover from every collection with auto=true, picked by hashing the filename.",
+  "auto": {
+    "_comment": "Where automatic covers apply. A note's own `banner:` always wins.",
+    "skipFolders": [
+      "People/"
+    ],
+    "minWords": {
+      "Notes/": 500
+    }
+  },
   "collections": [
     {
       "name": "Artemis II",
