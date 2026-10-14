@@ -1,6 +1,7 @@
 const { Plugin, MarkdownView, TFile, Modal, FuzzySuggestModal, Setting, Notice, setIcon } = require("obsidian");
 
 // Frontmatter:
+//   banner: <Set/codename>                       a banner from the library (Assets/Attachments/Banners)
 //   banner: <url | [[image]] | vault/path.jpg>   use this image
 //   banner: auto                                 automatic cover, even outside the auto folders
 //   banner: none                                 no banner
@@ -77,8 +78,37 @@ module.exports = class VishnusBanners extends Plugin {
       console.error("Vishnu's Banners: couldn't read covers.json", e);
       this.collections = [];
     }
-    this.autoPool = this.collections.filter((c) => c.auto).flatMap((c) => c.covers);
     this.autoRules = data?.auto ?? {};
+    this.libraryConf = data?.library ?? {};
+    await this.loadLibrary();
+    const sets = this.libraryConf.autoSets ?? [];
+    const fromLibrary = this.library.filter((e) => sets.includes(e.set) && e.src).map((e) => e.src);
+    // Fall back to the plain URL list when the library isn't there (e.g. a fresh device)
+    this.autoPool = fromLibrary.length ? fromLibrary : this.collections.filter((c) => c.auto).flatMap((c) => c.covers);
+  }
+
+  // Library: <root>/<Set>/<codename>.banner (metadata) + <codename>.banner.<ext> (image, optional)
+  async loadLibrary() {
+    this.library = [];
+    const root = this.libraryConf.path ?? "Assets/Attachments/Banners";
+    const adapter = this.app.vault.adapter;
+    if (!(await adapter.exists(root))) return;
+    for (const dir of (await adapter.list(root)).folders) {
+      const set = dir.split("/").pop();
+      const files = (await adapter.list(dir)).files;
+      for (const f of files.filter((f) => f.endsWith(".banner"))) {
+        const meta = {};
+        for (const line of (await adapter.read(f)).split("\n")) {
+          const m = line.match(/^([A-Za-z_]+):\s*(.*)$/);
+          if (!m) continue;
+          try { meta[m[1]] = JSON.parse(m[2]); } catch { meta[m[1]] = m[2]; }
+        }
+        const image = files.find((x) => x.startsWith(f + ".") && IMAGE_EXTS.includes(x.split(".").pop().toLowerCase()));
+        const code = f.split("/").pop().replace(/\.banner$/, "");
+        this.library.push({ set, code, key: `${set}/${code}`, meta, src: image ? adapter.getResourcePath(image) : meta.url ?? null });
+      }
+    }
+    this.libraryIndex = new Map(this.library.map((e) => [e.key, e]));
   }
 
   // Word count (frontmatter excluded), cached by mtime; null until first read
@@ -118,6 +148,8 @@ module.exports = class VishnusBanners extends Plugin {
   toSrc(value, file) {
     const v = String(value).trim().replace(/^!?\[\[|\]\]$/g, "").split("|")[0];
     if (/^(https?:|data:|app:)/.test(v)) return v;
+    const entry = this.libraryIndex?.get(v);
+    if (entry) return entry.src;
     const dest = this.app.metadataCache.getFirstLinkpathDest(v, file.path) ?? this.app.vault.getAbstractFileByPath(v);
     return dest instanceof TFile ? this.app.vault.getResourcePath(dest) : null;
   }
@@ -134,7 +166,8 @@ module.exports = class VishnusBanners extends Plugin {
     const src = own === "auto" ? this.autoCover(file)
       : own ? this.toSrc(value, file)
       : this.wantsAuto(file) ? this.autoCover(file) : null;
-    let y = parseFloat(fm.banner_y ?? fm["banner-y"]);
+    const entry = own && this.libraryIndex?.get(own);
+    let y = parseFloat(fm.banner_y ?? fm["banner-y"] ?? entry?.meta?.crop?.y);
     if (isNaN(y)) y = 50;
     else if (y <= 1) y *= 100; // old Banners plugin stored 0–1
     return src ? { src, y } : null;
@@ -257,8 +290,9 @@ class BannerModal extends Modal {
     this.file = file;
   }
 
-  onOpen() {
+  async onOpen() {
     const { contentEl, plugin, file } = this;
+    await plugin.loadLibrary(); // pick up banners added since startup
     this.modalEl.addClass("vb-modal");
     this.setTitle("Banner");
 
@@ -296,15 +330,17 @@ class BannerModal extends Modal {
       .addButton((b) => b.setButtonText("Default").onClick(() => choose(undefined)))
       .addButton((b) => b.setButtonText("No banner").setWarning().onClick(() => choose("none")));
 
+    // Library sets, one heading each
     const gallery = contentEl.createDiv({ cls: "vb-gallery" });
-    for (const col of plugin.collections) {
-      gallery.createEl("h6", { text: col.name });
+    const sets = [...new Set(plugin.library.map((e) => e.set))].sort();
+    for (const set of sets) {
+      gallery.createEl("h6", { text: set });
       const grid = gallery.createDiv({ cls: "vb-grid" });
-      for (const url of col.covers) {
-        const tile = grid.createEl("button", { cls: "vb-tile" });
-        tile.createEl("img", { attr: { src: url, loading: "lazy", alt: "" } });
-        if (url === current) tile.addClass("is-selected");
-        tile.addEventListener("click", () => choose(url));
+      for (const e of plugin.library.filter((x) => x.set === set && x.src)) {
+        const tile = grid.createEl("button", { cls: "vb-tile", attr: { title: e.meta.title ?? e.code } });
+        tile.createEl("img", { attr: { src: e.src, loading: "lazy", alt: "" } });
+        if (e.key === current) tile.addClass("is-selected");
+        tile.addEventListener("click", () => choose(e.key));
       }
     }
   }

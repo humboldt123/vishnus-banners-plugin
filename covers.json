@@ -155,5 +155,18 @@
         "https://www.notion.so/images/page-cover/usda_pear.png"
       ]
     }
-  ]
+  ],
+  "library": {
+    "_comment": "Banner library folder, and which of its sets feed automatic covers",
+    "path": "Assets/Attachments/Banners",
+    "autoSets": [
+      "Notion Artemis II",
+      "Notion NASA Archive",
+      "Notion James Webb Telescope",
+      "Notion MET",
+      "Notion MET Japanese Prints",
+      "Notion Rijksmuseum",
+      "Notion USDA Pomological Watercolors"
+    ]
+  }
 }
