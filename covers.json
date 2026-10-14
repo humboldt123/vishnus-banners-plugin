@@ -157,15 +157,26 @@
     }
   ],
   "library": {
-    "_comment": "Banner library folder. autoSets: folder-name patterns (* = anything) whose banners feed automatic covers. Add, rename or delete set folders freely.",
+    "_comment": "Banner library folder. autoSets: folder-name patterns (* = anything) whose banners feed automatic covers. Add, rename or delete set folders freely. excludeSets: sets left out of automatic picks unless a rule lists them under `sets`.",
     "path": "Assets/Attachments/Banners",
     "autoSets": [
       "Notion *"
+    ],
+    "excludeSets": [
+      "Notion Artemis II"
     ]
   },
   "rules": [
     {
-      "_comment": "Checked top to bottom; the first rule that matches AND whose share includes the note wins. Pools are library banners carrying any of the rule's tags. Dates come from YYYY-MM-DD filenames or a date: property; from/to are MM-DD and may wrap past New Year."
+      "_comment": "Checked top to bottom; the first rule that matches AND whose share includes the note wins. Pools are library banners carrying any of the rule's tags. Dates come from YYYY-MM-DD filenames or a date: property; from/to are MM-DD and may wrap past New Year. moon: \"full\" matches dates within a day of a full moon. sets: pull whole library sets instead of (or as well as) tags."
+    },
+    {
+      "name": "full-moon",
+      "moon": "full",
+      "sets": [
+        "Notion Artemis II"
+      ],
+      "share": 1
     },
     {
       "name": "halloween",

@@ -18,6 +18,13 @@ function hash(str) {
   return h >>> 0;
 }
 
+// Moon phase for a calendar date: 0 = new, 0.5 = full (mean synodic month from the 2000-01-06 new moon)
+function moonPhase(y, m, d) {
+  const days = (Date.UTC(y, m - 1, d, 12) - Date.UTC(2000, 0, 6, 18, 14)) / 86400000;
+  return ((days / 29.530588853) % 1 + 1) % 1;
+}
+const isFullMoon = (date) => Math.abs(moonPhase(date.year, date.month, date.day) - 0.5) * 29.530588853 <= 1;
+
 // Automatic picks only use banners the wiki can also show, so both always agree
 const isPublicEntry = (e) => !!(e.meta.url || e.meta.ingit);
 
@@ -98,10 +105,15 @@ module.exports = class VishnusBanners extends Plugin {
   buildAutoPool() {
     const pats = (this.libraryConf.autoSets ?? []).map((p) => new RegExp("^" + p.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$"));
     // Membership comes from .banner files alone (committed everywhere), not from whether an image is present
-    const fromLibrary = this.library.filter((e) => isPublicEntry(e) && pats.some((re) => re.test(e.set)));
+    const fromLibrary = this.library.filter((e) => isPublicEntry(e) && !this.excluded(e) && pats.some((re) => re.test(e.set)));
     // Fall back to the plain URL list when the library isn't there (e.g. a fresh device)
     this.autoPool = fromLibrary.length ? fromLibrary
       : this.collections.filter((c) => c.auto).flatMap((c) => c.covers).map((url) => ({ src: url, meta: { url } }));
+  }
+
+  // Sets kept out of automatic picks unless a rule names them in `sets`
+  excluded(e) {
+    return (this.libraryConf.excludeSets ?? []).includes(e.set);
   }
 
   // Rescan the library at most every 30s, so banners added or deleted by hand show up
@@ -209,11 +221,15 @@ module.exports = class VishnusBanners extends Plugin {
   // The note's date: a YYYY-MM-DD filename (logs), else a `date:` property
   noteDate(file) {
     const m = file.basename.match(/^(\d{4})-(\d{2})-(\d{2})$/) ?? String(this.frontmatter(file).date ?? "").match(/^(\d{4})-(\d{2})-(\d{2})/);
-    return m ? { month: +m[2], day: +m[3] } : null;
+    return m ? { year: +m[1], month: +m[2], day: +m[3] } : null;
   }
 
   // Does a rule apply to this note? Any given condition must hold (folders OR keywords for topics; date range for dates)
   ruleMatches(rule, file) {
+    if (rule.moon === "full") {
+      const d = this.noteDate(file);
+      if (!d || !isFullMoon(d)) return false;
+    }
     if (rule.from && rule.to) {
       const d = this.noteDate(file);
       if (!d) return false;
@@ -236,9 +252,11 @@ module.exports = class VishnusBanners extends Plugin {
   // take the rule's pool; which ones is decided by the filename, so a note never flips.
   autoEntry(file) {
     for (const rule of this.rules ?? []) {
-      if (!rule.tags?.length || !this.ruleMatches(rule, file)) continue;
+      if (!(rule.tags?.length || rule.sets?.length) || !this.ruleMatches(rule, file)) continue;
       if ((hash(file.basename + ":" + rule.name) % 1000) >= (rule.share ?? 1) * 1000) continue;
-      const pool = this.library.filter((e) => isPublicEntry(e) && (e.meta.tags ?? []).some((t) => rule.tags.includes(t)));
+      const pool = this.library.filter((e) => isPublicEntry(e) && (
+        (rule.sets ?? []).includes(e.set) ||
+        (!this.excluded(e) && (e.meta.tags ?? []).some((t) => (rule.tags ?? []).includes(t)))));
       if (pool.length) return pool[hash(file.basename) % pool.length];
     }
     return this.autoPool.length ? this.autoPool[hash(file.basename) % this.autoPool.length] : null;
