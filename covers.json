@@ -162,5 +162,101 @@
     "autoSets": [
       "Notion *"
     ]
-  }
+  },
+  "rules": [
+    {
+      "_comment": "Checked top to bottom; the first rule that matches AND whose share includes the note wins. Pools are library banners carrying any of the rule's tags. Dates come from YYYY-MM-DD filenames or a date: property; from/to are MM-DD and may wrap past New Year."
+    },
+    {
+      "name": "halloween",
+      "from": "10-24",
+      "to": "10-31",
+      "tags": [
+        "halloween"
+      ],
+      "share": 0.6
+    },
+    {
+      "name": "christmas",
+      "from": "12-18",
+      "to": "12-26",
+      "tags": [
+        "christmas"
+      ],
+      "share": 0.6
+    },
+    {
+      "name": "physics",
+      "folders": [
+        "Notes/Physics/"
+      ],
+      "keywords": [
+        "black hole",
+        "quantum",
+        "photon"
+      ],
+      "tags": [
+        "physics",
+        "space"
+      ],
+      "share": 0.6
+    },
+    {
+      "name": "math",
+      "folders": [
+        "Notes/Maths/"
+      ],
+      "tags": [
+        "math"
+      ],
+      "share": 0.6
+    },
+    {
+      "name": "computing",
+      "folders": [
+        "Notes/Machine Learning/",
+        "Notes/Computer Science/"
+      ],
+      "tags": [
+        "computing"
+      ],
+      "share": 0.5
+    },
+    {
+      "name": "winter",
+      "from": "12-01",
+      "to": "02-28",
+      "tags": [
+        "winter"
+      ],
+      "share": 0.25
+    },
+    {
+      "name": "spring",
+      "from": "03-01",
+      "to": "05-31",
+      "tags": [
+        "spring"
+      ],
+      "share": 0.25
+    },
+    {
+      "name": "summer",
+      "from": "06-01",
+      "to": "08-31",
+      "tags": [
+        "summer"
+      ],
+      "share": 0.25
+    },
+    {
+      "name": "autumn",
+      "from": "09-01",
+      "to": "11-30",
+      "tags": [
+        "autumn"
+      ],
+      "share": 0.25
+    }
+  ]
 }

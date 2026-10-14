@@ -86,6 +86,7 @@ module.exports = class VishnusBanners extends Plugin {
     }
     this.autoRules = data?.auto ?? {};
     this.libraryConf = data?.library ?? {};
+    this.rules = data?.rules ?? [];
     await this.loadLibrary();
     this.buildAutoPool();
   }
@@ -164,7 +165,7 @@ module.exports = class VishnusBanners extends Plugin {
       this.pendingCounts.add(file.path);
       this.app.vault.cachedRead(file).then((text) => {
         const body = text.replace(/^---\n[\s\S]*?\n---\n?/, "");
-        this.wordCache.set(file.path, { mtime: file.stat.mtime, words: body.split(/\s+/).filter(Boolean).length });
+        this.wordCache.set(file.path, { mtime: file.stat.mtime, words: body.split(/\s+/).filter(Boolean).length, text: body.slice(0, 50000).toLowerCase() });
         this.pendingCounts.delete(file.path);
         this.refreshAll();
       });
@@ -199,7 +200,41 @@ module.exports = class VishnusBanners extends Plugin {
     return dest instanceof TFile ? this.app.vault.getResourcePath(dest) : null;
   }
 
+  // The note's date: a YYYY-MM-DD filename (logs), else a `date:` property
+  noteDate(file) {
+    const m = file.basename.match(/^(\d{4})-(\d{2})-(\d{2})$/) ?? String(this.frontmatter(file).date ?? "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? { month: +m[2], day: +m[3] } : null;
+  }
+
+  // Does a rule apply to this note? Any given condition must hold (folders OR keywords for topics; date range for dates)
+  ruleMatches(rule, file) {
+    if (rule.from && rule.to) {
+      const d = this.noteDate(file);
+      if (!d) return false;
+      const md = d.month * 100 + d.day;
+      const [fm, fd] = rule.from.split("-").map(Number), [tm, td] = rule.to.split("-").map(Number);
+      const a = fm * 100 + fd, b = tm * 100 + td;
+      if (!(a <= b ? md >= a && md <= b : md >= a || md <= b)) return false; // ranges may wrap past New Year
+    }
+    if (rule.folders || rule.keywords) {
+      const inFolder = (rule.folders ?? []).some((f) => file.path.startsWith(f));
+      if (rule.keywords && this.words(file) === null) return false; // text still loading; refresh re-runs this
+      const text = this.wordCache.get(file.path)?.text ?? "";
+      const hasWord = (rule.keywords ?? []).some((k) => text.includes(k.toLowerCase()));
+      if (!inFolder && !hasWord) return false;
+    }
+    return true;
+  }
+
+  // Rules in covers.json, first match wins. `share` (0–1) is the fraction of matching notes that
+  // take the rule's pool; which ones is decided by the filename, so a note never flips.
   autoEntry(file) {
+    for (const rule of this.rules ?? []) {
+      if (!rule.tags?.length || !this.ruleMatches(rule, file)) continue;
+      if ((hash(file.basename + ":" + rule.name) % 1000) >= (rule.share ?? 1) * 1000) continue;
+      const pool = this.library.filter((e) => e.src && (e.meta.tags ?? []).some((t) => rule.tags.includes(t)));
+      if (pool.length) return pool[hash(file.basename) % pool.length];
+    }
     return this.autoPool.length ? this.autoPool[hash(file.basename) % this.autoPool.length] : null;
   }
 
