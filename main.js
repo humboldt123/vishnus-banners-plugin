@@ -110,8 +110,28 @@ module.exports = class VishnusBanners extends Plugin {
     this.resizeObserver.observe(scroller);
   }
 
+  // Re-add the banner (or put it back first) when something else rearranges a host's children,
+  // e.g. reading view prepending the inline title + properties on every switch into it
+  watch(host) {
+    this.watched ??= new WeakSet();
+    if (this.watched.has(host)) return;
+    this.watched.add(host);
+    const mo = new MutationObserver(() => {
+      if (host.dataset.vbWant && !host.firstElementChild?.classList.contains("vb-banner")) this.queueRefresh();
+    });
+    mo.observe(host, { childList: true });
+    (this.mutationObservers ??= []).push(mo);
+  }
+
+  queueRefresh() {
+    if (this.refreshQueued) return;
+    this.refreshQueued = true;
+    requestAnimationFrame(() => { this.refreshQueued = false; this.refreshAll(); });
+  }
+
   onunload() {
     this.resizeObserver?.disconnect();
+    this.mutationObservers?.forEach((mo) => mo.disconnect());
     document.querySelectorAll(".vb-banner").forEach((el) => el.remove());
   }
 
@@ -386,19 +406,24 @@ module.exports = class VishnusBanners extends Plugin {
       const view = leaf.view;
       if (!(view instanceof MarkdownView) || !view.file) return;
       const banner = this.resolve(view.file);
+      // Reading view lives in the header section: the sizer itself gets its children reset to the
+      // rendered sections on every re-render, which wiped the banner
       const hosts = [
         { el: view.contentEl.querySelector(".markdown-source-view .cm-sizer"), editable: true },
-        { el: view.contentEl.querySelector(".markdown-reading-view .markdown-preview-sizer"), editable: false },
+        { el: view.contentEl.querySelector(".markdown-reading-view .markdown-preview-sizer > .mod-header"), editable: false },
       ];
+      view.contentEl.querySelector(".markdown-reading-view .markdown-preview-sizer > .vb-banner")?.remove();
       for (const host of hosts) {
         if (!host.el) continue;
+        host.el.dataset.vbWant = banner ? "1" : "";
+        this.watch(host.el);
         let el = host.el.querySelector(":scope > .vb-banner");
         if (!banner) { el?.remove(); continue; }
         if (!el) {
           el = createDiv({ cls: "vb-banner" });
-          host.el.prepend(el);
           if (host.editable) this.addControls(el, view);
         }
+        if (host.el.firstElementChild !== el) host.el.prepend(el);
         if (el.dataset.repositioning) continue;
         if (host.editable) {
           const warn = this.isPublished(view.file) && !this.isPublic(view.file);
@@ -414,8 +439,8 @@ module.exports = class VishnusBanners extends Plugin {
         el.style.backgroundPosition = banner.pattern ? "" : `50% ${banner.y}%`;
         // Bleed out to the scroll area's edges (top, left, right), past its padding
         const scroller = host.el.closest(".cm-scroller, .markdown-preview-view");
+        if (scroller) this.observe(scroller); // even while hidden, so showing it re-fits the banner
         if (scroller && el.offsetParent) {
-          this.observe(scroller);
           el.style.margin = "0 0 1.5rem 0";
           el.style.width = "";
           const s = scroller.getBoundingClientRect();
